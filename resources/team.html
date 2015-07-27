@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>title</title>
+  </head>
+  <body>
+      <form method="get" action="">
+          <table>
+              {{#team}}
+              <tr>
+                  <td>
+                      <select name="winner{{.}}">
+                          <option value="">None</option>
+                          {{#champions}}
+                          <option value="{{id}}">{{name}}</option>
+                          {{/champions}}
+                      </select>
+                  </td>
+                  <td>
+                      <select name="loser{{.}}">
+                          <option value="">None</option>
+                          {{#champions}}
+                          <option value="{{id}}">{{name}}</option>
+                          {{/champions}}
+                      </select>
+                  </td>
+              </tr>
+              {{/team}}
+          </table>
+          <input type="submit" value="Recommend my pick!" />
+      </form>
+      <ol>
+          {{#suggestion}}
+          <li>{{.}}</li>
+          {{/suggestion}}
+      </ol>
+  </body>
+</html>

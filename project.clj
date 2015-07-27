@@ -12,6 +12,7 @@
                  [ring/ring-core "1.4.0"]
                  [ring/ring-jetty-adapter "1.4.0"]
                  [compojure "1.4.0"]
+                 [stencil "0.4.0"]
                  [org.clojure/algo.generic "0.1.2"]]
   :plugins [[lein-ring "0.9.6"]]
   :ring {:handler lolteambuilder.core/app}

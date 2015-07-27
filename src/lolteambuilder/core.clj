@@ -9,16 +9,23 @@
     [clojure.java.jdbc :as sql]
     [clj-postgresql.core :as pg]
     [cheshire.core :as json]
+    [stencil.core :as mustache]
     [clj-http.client :as http])
   (:gen-class))
+
+;debugging
+(require 'stencil.loader 'clojure.core.cache)
+(stencil.loader/set-cache (clojure.core.cache/ttl-cache-factory {} :ttl 0))
+
 
 (def spec (or (System/getenv "DATABASE_URL")
               "postgresql://localhost:5432/teambuilder"))
 
 (defn create-table [conn]
   (sql/db-do-commands conn
-    "DROP TABLE matches"
+    "DROP TABLE IF EXISTS matches"
     "CREATE TABLE matches (
+      matchId integer PRIMARY KEY,
       winners integer[5],
       losers  integer[5]
     )"
@@ -47,7 +54,8 @@
               [(get-tid %2)]
               conj
               (get %2 "championId"))
-      {} (get match "participants"))))
+      {:matchId (get match "matchId")}
+      (get match "participants"))))
 
 (defn insert-matches [matches]
   (sql/with-db-transaction [conn spec]
@@ -70,9 +78,28 @@
         data (get (json/parse-stream stream) "data")]
     (map-invert (fmap #(Integer. (get % "key")) data))))
 
+(defn parse-team [prefix params]
+  (or (vals (filter #(and
+                       (.startsWith (key %) prefix)
+                       (not (empty? (val %))))
+                    params))
+      ()))
+
+(defn team-page [params]
+  (let [winners (parse-team "winner" params)
+        losers  (parse-team "loser"  params)
+        suggestion (get-team spec winners losers)
+        names (map #(get champion-map (:id %)) suggestion)
+        champions (map (fn [[id name]] {:name name :id id}) champion-map) ]
+    (mustache/render-file "team.html"
+      {:params params
+       :champions (sort-by :name champions)
+       :team (range 5)
+       :suggestion (vec names)})))
+
 (defroutes routes
   (GET  "/" [] "Hello world")
-  (GET "/team" {params :params} (json/generate-string params)))
+  (GET "/team" {params :params} (team-page params)))
 
 (def app (wrap-params routes))
 
