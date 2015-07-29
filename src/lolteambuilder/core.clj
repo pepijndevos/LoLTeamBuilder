@@ -131,6 +131,7 @@
       (filter seq
         (for [{id :matchId} (take 50 (:matches history))]
           (try
+            (Thread/sleep 1000) ; maybe rate-limited
             (match region id)
             (catch clojure.lang.ExceptionInfo e
               (println e)
