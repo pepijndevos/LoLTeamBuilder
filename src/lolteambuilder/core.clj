@@ -156,6 +156,7 @@
   (GET  "/" [] (mustache/render-file "index.html"
                  {:regions (map (fn [reg] {:name reg}) regions)}))
   (POST  "/" {params :params} (search-page params))
+  (GET  "/riot.txt" [] "c0a9de7b-0355-4dcb-b63a-a7b62c19de83")
   (GET "/team" {params :params} (team-page params)))
 
 (def app (wrap-params routes))
