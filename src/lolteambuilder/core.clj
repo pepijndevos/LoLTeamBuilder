@@ -130,7 +130,6 @@
     (insert-matches
       (filter seq
         (for [{id :matchId} (take 50 (:matches history))]
-          (Thread/sleep 1000)
           (try
             (match region id)
             (catch clojure.lang.ExceptionInfo e
