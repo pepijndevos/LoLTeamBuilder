@@ -71,30 +71,36 @@
          AND ? <@ winners
     GROUP BY id
     ORDER BY count DESC
-       LIMIT 10" losers winners]))
+       LIMIT 10" (or losers ())  (or winners ())]))
 
 (def champion-map
   (let [stream (io/reader (io/resource "champion.json"))
         data (get (json/parse-stream stream) "data")]
     (map-invert (fmap #(Integer. (get % "key")) data))))
 
+(def champion-list (sort-by :name champion-map))
+
 (defn parse-team [prefix params]
-  (or (vals (filter #(and
-                       (.startsWith (key %) prefix)
-                       (not (empty? (val %))))
-                    params))
-      ()))
+  (->> (get params prefix)
+      (filter seq)
+      (map #(Integer. %))))
+
+(defn select-options [champids]
+  (for [champid (take 5 (concat champids (repeat -1)))]
+    (map (fn [[id name]]
+           {:name name :id id :selected (= id champid)})
+         champion-list)))
 
 (defn team-page [params]
   (let [winners (parse-team "winner" params)
         losers  (parse-team "loser"  params)
         suggestion (get-team spec winners losers)
         names (map #(get champion-map (:id %)) suggestion)
-        champions (map (fn [[id name]] {:name name :id id}) champion-map) ]
+        teams (map (fn [w l] {:winner w :loser l})
+                   (select-options winners) (select-options losers)) ]
     (mustache/render-file "team.html"
       {:params params
-       :champions (sort-by :name champions)
-       :team (range 5)
+       :teams teams
        :suggestion (vec names)})))
 
 (defroutes routes

@@ -5,28 +5,28 @@
     <title>title</title>
   </head>
   <body>
-      <form method="get" action="">
+      <form method="GET" action="/team">
           <table>
-              {{#team}}
+              {{#teams}}
               <tr>
                   <td>
-                      <select name="winner{{.}}">
+                      <select name="winner">
                           <option value="">None</option>
-                          {{#champions}}
-                          <option value="{{id}}">{{name}}</option>
-                          {{/champions}}
+                          {{#winner}}
+                          <option {{#selected}}selected{{/selected}} value="{{id}}">{{name}}</option>
+                          {{/winner}}
                       </select>
                   </td>
                   <td>
-                      <select name="loser{{.}}">
+                      <select name="loser">
                           <option value="">None</option>
-                          {{#champions}}
-                          <option value="{{id}}">{{name}}</option>
-                          {{/champions}}
+                          {{#loser}}
+                          <option {{#selected}}selected{{/selected}} value="{{id}}">{{name}}</option>
+                          {{/loser}}
                       </select>
                   </td>
               </tr>
-              {{/team}}
+              {{/teams}}
           </table>
           <input type="submit" value="Recommend my pick!" />
       </form>
