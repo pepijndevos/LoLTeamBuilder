@@ -3,6 +3,7 @@
   :url "http://example.com/FIXME"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
+  :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/java.jdbc "0.3.7"]
                  [clj-http "2.0.0"]
@@ -17,6 +18,5 @@
   :plugins [[lein-ring "0.9.6"]]
   :ring {:handler lolteambuilder.core/app}
   :main ^:skip-aot lolteambuilder.core
-  :target-path "target/%s"
   :uberjar-name "standalone.jar"
   :profiles {:uberjar {:aot :all}})
