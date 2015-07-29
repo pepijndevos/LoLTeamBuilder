@@ -10,6 +10,7 @@
     [clj-postgresql.core :as pg]
     [cheshire.core :as json]
     [stencil.core :as mustache]
+    [ring.util.response :refer [redirect]]
     [clj-http.client :as http])
   (:gen-class))
 
@@ -25,7 +26,7 @@
   (sql/db-do-commands conn
     "DROP TABLE IF EXISTS matches"
     "CREATE TABLE matches (
-      matchId integer PRIMARY KEY,
+      matchId bigint PRIMARY KEY,
       winners integer[5],
       losers  integer[5]
     )"
@@ -36,32 +37,34 @@
     (for [i (range 1 11)
           :let [resname (str "matches" i ".json")
                 stream (io/reader (io/resource resname))
-                data (json/parse-stream stream)]
-          match (get data "matches")]
+                data (json/parse-stream stream true)]
+          match (get data :matches)]
       match))
 
 (defn team-ids [match]
   (reduce
     #(assoc %1
-      (get %2 "teamId")
-      (if (get %2 "winner") :winners :losers))
-    {} (get match "teams")))
+      (get %2 :teamId)
+      (if (get %2 :winner) :winners :losers))
+    {} (get match :teams)))
 
 (defn teams [match]
   (let [tid (team-ids match)
-        get-tid #(get tid (get % "teamId"))]
+        get-tid #(get tid (get % :teamId))]
     (reduce #(update-in %1
               [(get-tid %2)]
               conj
-              (get %2 "championId"))
-      {:matchId (get match "matchId")}
-      (get match "participants"))))
+              (get %2 :championId))
+      {:matchId (get match :matchId)}
+      (get match :participants))))
 
 (defn insert-matches [matches]
-  (sql/with-db-transaction [conn spec]
+  (sql/with-db-connection [conn spec]
     (doseq [match matches]
-      (sql/insert! conn :matches (teams match))
-      (print "."))))
+      (try
+        (sql/insert! conn :matches (teams match))
+        (catch java.sql.SQLException e (println e)))
+      (print ".")(flush))))
 
 (defn get-team [conn winners losers]
   (sql/query conn [
@@ -78,7 +81,7 @@
         data (get (json/parse-stream stream) "data")]
     (map-invert (fmap #(Integer. (get % "key")) data))))
 
-(def champion-list (sort-by :name champion-map))
+(def champion-list (sort-by val champion-map))
 
 (defn parse-team [prefix params]
   (->> (get params prefix)
@@ -103,8 +106,56 @@
        :teams teams
        :suggestion (vec names)})))
 
+(defn api-get [region version api resource params]
+  (let [base (str "https://" region ".api.pvp.net/api/lol")
+        url (apply str (interpose "/" [base region version api resource]))
+        params (assoc params "api_key" (System/getenv "APIKEY"))]
+    (println url params)
+    (:body (http/get url {:query-params params, :as :json}))))
+
+(defn match-list [region summoner-id]
+  (api-get region "v2.2" "matchlist/by-summoner" summoner-id
+           {"rankedQueues" "RANKED_SOLO_5x5,RANKED_TEAM_3x3,RANKED_TEAM_5x5"}))
+
+(defn match [region match-id]
+  (api-get region "v2.2" "match" match-id {}))
+
+(defn summoner [region summoner-name]
+  (api-get region "v1.4" "summoner/by-name" summoner-name {}))
+
+(def regions ["br" "eune" "euw" "kr" "lan" "las" "na" "oce" "ru" "tr"])
+
+(defn download-matches [region summoner-id]
+  (let [history (match-list region summoner-id)]
+    (insert-matches
+      (filter seq
+        (for [{id :matchId} (take 50 (:matches history))]
+          (try
+            (match region id)
+            (catch clojure.lang.ExceptionInfo e
+              (println e)
+              (Thread/sleep 10000) ; maybe rate-limited
+              nil)))))))
+
+(defn search-page [params]
+  (let [region (get params "region")
+        summoner-name (.toLowerCase (get params "summoner" ""))
+        data {:summoner summoner-name
+              :region region
+              :message "Summoner not found."
+              :regions (map (fn [reg] {:name reg :selected (= reg region)}) regions)}
+        summoner-data (try
+                        (summoner region summoner-name)
+                        (catch clojure.lang.ExceptionInfo e))]
+    (future (download-matches region (get-in summoner-data [(keyword summoner-name) :id])))
+    (if summoner-data
+      (redirect "/team")
+      (mustache/render-file "index.html" data))))
+
 (defroutes routes
-  (GET  "/" [] "Hello world")
+  (GET  "/" [] (mustache/render-file "index.html"
+                 {:regions (map (fn [reg] {:name reg}) regions)}))
+  (POST  "/" {params :params} (search-page params))
   (GET "/team" {params :params} (team-page params)))
 
 (def app (wrap-params routes))

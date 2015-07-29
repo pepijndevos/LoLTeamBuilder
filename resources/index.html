@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Lol Team Builder</title>
+  </head>
+  <body>
+      <form method="POST" action="/">
+        <label>Region: <select name="region">
+            {{#regions}}
+            <option {{#selected}}selected{{/selected}}>{{name}}</option>
+            {{/regions}}
+        </select>
+        </label>
+        <label>Sumonner name: <input type="text" name="summoner" value="{{summoner}}" /></label>
+        <input type="submit" value="Get started!" />
+      </form>
+      <p>{{message}}</p>
+  </body>
+</html>
