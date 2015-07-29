@@ -18,4 +18,5 @@
   :ring {:handler lolteambuilder.core/app}
   :main ^:skip-aot lolteambuilder.core
   :target-path "target/%s"
+  :uberjar-name "standalone.jar"
   :profiles {:uberjar {:aot :all}})
