@@ -11,6 +11,7 @@
     [cheshire.core :as json]
     [stencil.core :as mustache]
     [ring.util.response :refer [redirect]]
+    [slingshot.slingshot :refer [try+]]
     [clj-http.client :as http])
   (:gen-class))
 
@@ -58,13 +59,12 @@
       {:matchId (get match :matchId)}
       (get match :participants))))
 
-(defn insert-matches [matches]
-  (sql/with-db-connection [conn spec]
-    (doseq [match matches]
-      (try
-        (sql/insert! conn :matches (teams match))
-        (catch java.sql.SQLException e (println e)))
-      (print ".")(flush))))
+(defn insert-matches [conn matches]
+  (doseq [match matches]
+    (try+
+      (sql/insert! conn :matches (teams match))
+      (catch java.sql.SQLException e
+        (println e)))))
 
 (defn get-team [conn winners losers]
   (sql/query conn [
@@ -75,6 +75,17 @@
     GROUP BY id
     ORDER BY count DESC
        LIMIT 10" (or losers ())  (or winners ())]))
+
+(defn filter-matches [conn matches]
+  (map :id
+       (sql/query conn [
+        "SELECT *
+           FROM UNNEST(?::bigint[]) AS u(id)
+          WHERE NOT EXISTS
+                (SELECT 1
+                   FROM matches
+                  WHERE matches.matchid = u.id)"
+         matches])))
 
 (def champion-map
   (let [stream (io/reader (io/resource "champion.json"))
@@ -110,8 +121,16 @@
   (let [base (str "https://" region ".api.pvp.net/api/lol")
         url (apply str (interpose "/" [base region version api resource]))
         params (assoc params "api_key" (System/getenv "APIKEY"))]
-    (println url params)
-    (:body (http/get url {:query-params params, :as :json}))))
+    (loop []
+      (println url params)
+      (if-let [m (try+
+                   (:body (http/get url {:query-params params, :as :json}))
+                   (catch [:status 429] {{retry "Retry-After"} :headers}
+                     (println "Rate limit exceeded, retry after" retry)
+                     (when retry
+                       (Thread/sleep (* 1000 (Integer. retry))))))]
+        m
+        (recur)))))
 
 (defn match-list [region summoner-id]
   (api-get region "v2.2" "matchlist/by-summoner" summoner-id
@@ -126,16 +145,13 @@
 (def regions ["br" "eune" "euw" "kr" "lan" "las" "na" "oce" "ru" "tr"])
 
 (defn download-matches [region summoner-id]
-  (let [history (match-list region summoner-id)]
-    (insert-matches
-      (filter seq
-        (for [{id :matchId} (take 50 (:matches history))]
-          (try
-            (match region id)
-            (catch clojure.lang.ExceptionInfo e
-              (println e)
-              (Thread/sleep 10000) ; maybe rate-limited
-              nil)))))))
+  (sql/with-db-connection [conn spec]
+    (let [history (match-list region summoner-id)
+          match-ids (map :matchId (:matches history))
+          match-ids (filter-matches conn match-ids)]
+      (insert-matches conn
+        (for [id match-ids]
+          (match region id))))))
 
 (defn search-page [params]
   (let [region (get params "region")
@@ -144,9 +160,9 @@
               :region region
               :message "Summoner not found."
               :regions (map (fn [reg] {:name reg :selected (= reg region)}) regions)}
-        summoner-data (try
+        summoner-data (try+
                         (summoner region summoner-name)
-                        (catch clojure.lang.ExceptionInfo e))]
+                        (catch [:status 404] _))]
     (future (download-matches region (get-in summoner-data [(keyword summoner-name) :id])))
     (if summoner-data
       (redirect "/team")
