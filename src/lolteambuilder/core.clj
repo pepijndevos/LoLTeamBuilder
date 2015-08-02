@@ -144,6 +144,9 @@
 
 (def regions ["br" "eune" "euw" "kr" "lan" "las" "na" "oce" "ru" "tr"])
 
+(defn normalize [summoner]
+  (.replace (.toLowerCase summoner) " " ""))
+
 (defn download-matches [region summoner-id]
   (sql/with-db-connection [conn spec]
     (let [history (match-list region summoner-id)
@@ -155,7 +158,7 @@
 
 (defn search-page [params]
   (let [region (get params "region")
-        summoner-name (.toLowerCase (get params "summoner" ""))
+        summoner-name (normalize (get params "summoner" ""))
         data {:summoner summoner-name
               :region region
               :message "Summoner not found."
