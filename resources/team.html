@@ -7,6 +7,7 @@
   <body>
       <form method="GET" action="/team">
           <table>
+              <tr><td>Allies</td><td>Opponents</td></tr>
               {{#teams}}
               <tr>
                   <td>
@@ -30,10 +31,11 @@
           </table>
           <input type="submit" value="Recommend my pick!" />
       </form>
-      <ol>
+      <table>
+        <tr><td>Champion</td><td>Composition wins</td><td>Recorded games</td></tr>
           {{#suggestion}}
-          <li>{{.}}</li>
+          <tr><td>{{id}}</td><td>{{wins}}</td><td>{{plays}}</td></tr>
           {{/suggestion}}
-      </ol>
+      </table>
   </body>
 </html>

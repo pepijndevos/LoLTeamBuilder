@@ -68,13 +68,18 @@
 
 (defn get-team [conn winners losers]
   (sql/query conn [
-     "SELECT UNNEST(winners) as id, COUNT(*) as count
-        FROM matches 
-       WHERE ? <@ losers
-         AND ? <@ winners
-    GROUP BY id
-    ORDER BY count DESC
-       LIMIT 10" (or losers ())  (or winners ())]))
+"SELECT comp.id as id, comp.count as wins, total.count as plays FROM
+    (SELECT UNNEST(winners || losers) AS id,
+            COUNT(*) as count
+       FROM matches GROUP BY id) total,
+    (SELECT UNNEST(winners) AS id,
+            COUNT(*) as count
+       FROM matches
+      WHERE ? <@ losers
+        AND ? <@ winners
+      GROUP BY id) comp
+  WHERE total.id = comp.id
+  ORDER BY comp.count / total.count::float DESC" (or losers ())  (or winners ())]))
 
 (defn filter-matches [conn matches]
   (map :id
@@ -109,7 +114,7 @@
   (let [winners (parse-team "winner" params)
         losers  (parse-team "loser"  params)
         suggestion (get-team spec winners losers)
-        names (map #(get champion-map (:id %)) suggestion)
+        names (map #(update-in % [:id] champion-map) suggestion)
         teams (map (fn [w l] {:winner w :loser l})
                    (select-options winners) (select-options losers)) ]
     (mustache/render-file "team.html"

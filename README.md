@@ -8,7 +8,7 @@ Download seed data:
 
     cd resources
     curl -O "https://s3-us-west-1.amazonaws.com/riot-api/seed_data/matches[1-10].json"
-    curl -O "http://ddragon.leagueoflegends.com/cdn/5.2.1/data/en_US/champion.json"
+    curl -O "http://ddragon.leagueoflegends.com/cdn/5.14.1/data/en_US/champion.json"
 
 Create database
 
